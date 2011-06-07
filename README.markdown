@@ -14,8 +14,13 @@ Example:
     betterlogs.prefix=[%relativeFile:%line] %method() ::
     # Append 2 spaces at the end of the pattern
     betterlogs.prefix.trailingSpaces=2
-    # Set method trace level
+    # Set trace level
+    # - if trace.level is lower than application.log level then there will be no trace enhancement to code
     betterlogs.trace.level=DEBUG
+    # Set trace mode
+    # - NOTRACE: trace enhancement only to class/method/constructor been annotated with @Trace explicitly
+    # - TRACE: trace enhancement to all class/method/constructor with no @NoTrace annotation
+    betterlogs.trace.mode=NOTRACE
 
 
 In your code, the following call

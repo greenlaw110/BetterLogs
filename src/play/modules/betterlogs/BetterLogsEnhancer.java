@@ -18,26 +18,42 @@ package play.modules.betterlogs;
 import javassist.CannotCompileException;
 import javassist.CtBehavior;
 import javassist.CtClass;
+import javassist.CtConstructor;
 import javassist.CtMethod;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import play.Logger;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.classloading.enhancers.Enhancer;
+import play.modules.betterlogs.BetterLogsPlugin.TraceMode;
 
 public class BetterLogsEnhancer extends Enhancer {
+    
+    private boolean traceEnhance_(CtClass ctClass) {
+        return BetterLogsPlugin.traceEnabled && !ctClass.hasAnnotation(NoTrace.class);
+    }
+    
+    private boolean traceEnhance_(CtMethod ctMethod) {
+        return !ctMethod.isEmpty() && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctMethod.hasAnnotation(Trace.class) : !ctMethod.hasAnnotation(NoTrace.class));
+    }
+    
+    private boolean traceEnhance_(CtConstructor ctConstructor) {
+        return ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctConstructor.hasAnnotation(Trace.class) : !ctConstructor.hasAnnotation(NoTrace.class));
+    }
+    
     @Override
     public void enhanceThisClass(final ApplicationClass applicationClass)
             throws Exception {
         final CtClass ctClass = makeClass(applicationClass);
         if (ctClass.getName().matches(".*Plugin.*")) return;
         if (ctClass.isInterface()) return;
+         
         Logger.trace("BettterLogs: enhancing %s...", ctClass.getName());
         // entry/exit trace
-        if (BetterLogsPlugin.traceEnabled) {
+        if (traceEnhance_(ctClass)) {
             String traceMethod = BetterLogsPlugin.traceMethod;
             for (final CtMethod ctMethod : ctClass.getDeclaredMethods()) {
-                if (ctMethod.isEmpty()) continue;
+                if (!traceEnhance_(ctMethod)) continue;
                 // entry
                 String code = String.format("java.lang.String[] args = null; {play.Logger.%s(\"enter ...\", args);}",
                         traceMethod);
@@ -46,6 +62,17 @@ public class BetterLogsEnhancer extends Enhancer {
                 code = String.format("{java.lang.String[] args = null; play.Logger.%s(\"exit ...\", args);}",
                         traceMethod);
                 ctMethod.insertAfter(code);
+            }
+            for (final CtConstructor ctConstructor: ctClass.getConstructors()) {
+                if (!traceEnhance_(ctConstructor)) continue;
+                //entry
+                String code = String.format("java.lang.String[] args = null; {play.Logger.%s(\"enter ...\", args);}",
+                        traceMethod);
+                ctConstructor.insertBefore(code);
+                // exit
+                code = String.format("{java.lang.String[] args = null; play.Logger.%s(\"exit ...\", args);}",
+                        traceMethod);
+                ctConstructor.insertAfter(code);
             }
             ctClass.defrost();
         }

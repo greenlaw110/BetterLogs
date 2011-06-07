@@ -40,6 +40,8 @@ public class BetterLogsPlugin extends PlayPlugin {
     static boolean traceEnabled = false;
     static String traceLevel = "TRACE";
     static String traceMethod = "trace";
+    static TraceMode traceMode = TraceMode.NOTRACE;
+    static enum TraceMode {TRACE, NOTRACE};
 
     @Override
     public void enhance(ApplicationClass applicationClass) throws Exception {
@@ -92,8 +94,15 @@ public class BetterLogsPlugin extends PlayPlugin {
         String logLevel = Play.configuration.getProperty("application.log",
                 "INFO");
         java.util.logging.Level log_ = toJuliLevel(logLevel);
-        traceEnabled = log_.intValue() < trace_.intValue();
+        traceEnabled = log_.intValue() <= trace_.intValue();
         traceMethod = toLogMethod(traceLevel);
+        
+        String traceMode = Play.configuration.getProperty("betterlogs.trace.mode", "NOTRACE");
+        try {
+            BetterLogsPlugin.traceMode = TraceMode.valueOf(TraceMode.class, traceMode);
+        } catch (Exception e) {
+            Logger.warn("invalid tracemode found in config: %s. BetterLogs trace mode set to NOTRACE", traceMode);
+        }
         
         configured_ = true;
     }
