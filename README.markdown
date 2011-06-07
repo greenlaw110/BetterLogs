@@ -14,6 +14,8 @@ Example:
     betterlogs.prefix=[%relativeFile:%line] %method() ::
     # Append 2 spaces at the end of the pattern
     betterlogs.prefix.trailingSpaces=2
+    # Set method trace level
+    betterlogs.trace.level=DEBUG
 
 
 In your code, the following call
@@ -22,7 +24,25 @@ In your code, the following call
 
 will give you
 
-`12:47:05,499 INFO  ~ [/app/controllers/Application.java:10] index() ::  got 2 messages from somebody@gmail.com`
+`12:47:05,499 INFO  ~ [/app/controllers/Application.java:10|17] index() ::  got 2 messages from somebody@gmail.com`
+
+Where "17" is the current thread ID.
+
+When betterlogs.trace.level is equal or higher than application.log level then betterlogs will trace method execution by inject log method at entry/exit of every application method:
+
+In your code, the following method body
+
+`public|protected|private void|Object myMethod(...) {
+`...
+`}
+
+becomes
+`public|protected|private void|Object myMethod(...) {
+`Logger.trace|debug|info|...("enter"); // the log level defined by "betterlogs.trace.level"
+`...
+`Logger.trace|debug|info|...("exit"); // the log level defined by "betterlogs.trace.level"
+`}
+
 
 ## Pattern elements
 
@@ -36,6 +56,7 @@ You can add the following elements to the prefix pattern :
 * **%package** : the package of the class where the log has been called
 * **%method** : the name of the method in which the log has been called
 * **%signature** : the signature of the method in which the log has been called (ex: `(Ljava/lang/String;Lplay/Logger;I)V`)
+* **%thread** : the thread ID of the current thread the log method invoked
 
 ## Options
 

@@ -19,6 +19,8 @@ bc. module.betterlogs=somedirectory/betterlogs
 betterlogs.prefix=[%relativeFile:%line] %method() ::
 # Append 2 spaces at the end of the pattern
 betterlogs.prefix.trailingSpaces=2
+# Set method trace level
+betterlogs.trace.level=DEBUG
 
 p. In your code, the following code
 
@@ -26,7 +28,24 @@ bq. Logger.info("got %s messages from %s", 2, "somebody@gmail.com");
 
 p. will give you
 
-bq. 12:47:05,499 INFO ~ [/app/controllers/Application.java:10] index() :: got 2 messages from somebody@gmail.com
+bq. 12:47:05,499 INFO ~ [/app/controllers/Application.java:10|17] index() :: got 2 messages from somebody@gmail.com
+
+where "17" is the current thread ID.
+
+p. When betterlogs.trace.level is equal or higher than application.log level then betterlogs will trace method execution by inject log method at entry/exit of every application method:
+
+bq. public|protected|private void|Object myMethod(...) {
+...
+}
+
+p. becomes
+
+bq. public|protected|private void|Object myMethod(...) {
+Logger.trace|debug|info|...("enter"); // the log level defined by "betterlogs.trace.level"
+...
+Logger.trace|debug|info|...("exit"); // the log level defined by "betterlogs.trace.level"
+}
+
 
 h2. Pattern Elements
 
