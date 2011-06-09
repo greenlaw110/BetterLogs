@@ -45,6 +45,8 @@ public class BetterLogsPlugin extends PlayPlugin {
 
     @Override
     public void enhance(ApplicationClass applicationClass) throws Exception {
+        Logger.trace("betterlogs: prepare to enhance class %s...", applicationClass.name);
+        if (!configured_) onConfigurationRead();
         if (!disabled && configured_)
             e_.enhanceThisClass(applicationClass);
     }
@@ -57,6 +59,8 @@ public class BetterLogsPlugin extends PlayPlugin {
                 .getProperty("betterlogs.disabled"));
         if (disabled)
             Logger.warn("BetterLogs is disabled. The classes are no more enhanced. If you enable it again, don't forget to clean your app before to force Play to enhance all the classes.");
+        else
+            Logger.trace("BetterLogs enabled");
         ArrayList<String> newArgsPrefix = new ArrayList<String>();
         String prefix = Play.configuration.getProperty("betterlogs.prefix",
                 "[%relativeFile:%line|%thread] %method() ::");

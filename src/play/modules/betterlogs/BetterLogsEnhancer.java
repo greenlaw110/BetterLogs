@@ -44,6 +44,7 @@ public class BetterLogsEnhancer extends Enhancer {
     @Override
     public void enhanceThisClass(final ApplicationClass applicationClass)
             throws Exception {
+        Logger.trace("BetterLogsEnhancer.enhanceThisClass: enter");
         final CtClass ctClass = makeClass(applicationClass);
         if (ctClass.getName().matches(".*Plugin.*")) return;
         if (ctClass.isInterface()) return;
