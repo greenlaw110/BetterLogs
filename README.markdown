@@ -6,6 +6,8 @@ This very simple module enhances the Play! Framework logs to bring some missing 
 * Clone this module in somedirectory/betterlogs
 * Add this module to your application.conf
 * Customize the log pattern if you want
+* Trace your app with @Trace({"theme1", "theme2"}) marked on methods/constructors
+* BetterLogsPlugin.setTraceThemes("theme1", ...) to set which trace theme will output
 
 Example:
 

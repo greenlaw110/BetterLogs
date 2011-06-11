@@ -11,6 +11,8 @@ h2. How To Use It
 * If you use Play! < 1.2, you can add it to your application.conf
 * If you use Play! 1.2 or above, you can add it to your dependancies
 * Customize the log pattern if you want
+* Trace your app with @Trace({"theme1", "theme2"}) marked on the ap methods
+* BetterLogsPlugin.setTraceThemes("theme1",...) to set which trace theme will be output
 
 h3. Example
 
