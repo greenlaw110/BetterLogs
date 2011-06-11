@@ -65,9 +65,10 @@ public class BetterLogsEnhancer extends Enhancer {
                 .append("\", types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
                         + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
                         + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
-                .append(traceMethod);
+                .append(traceMethod)
+                .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
         // entry
-        String code = sb.toString() + "(\"%s ...\", sa); }";
+        String code = sb.toString() + "\"]%s ...\", sa); }";
         Logger.trace("betterlogs::trace: entry/exit code: %s", code);
         ctb.insertBefore(String.format(code, "enter"));
         // exit

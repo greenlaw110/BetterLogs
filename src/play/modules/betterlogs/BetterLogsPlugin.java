@@ -31,7 +31,7 @@ import play.classloading.enhancers.Enhancer;
 
 public class BetterLogsPlugin extends PlayPlugin {
     final static Pattern PREFIX_PATTERN = Pattern
-            .compile("%file|%line|%thread|%tracetheme|%class|%method|%relativeFile|%simpleClass|%package|%signature");
+            .compile("%file|%line|%thread|%class|%method|%relativeFile|%simpleClass|%package|%signature");
     final static Pattern TRAILING_SPACES_PATTERN = Pattern
             .compile("(\\d+)(t|ws)?");
 
@@ -66,7 +66,7 @@ public class BetterLogsPlugin extends PlayPlugin {
             Logger.trace("BetterLogs enabled");
         ArrayList<String> newArgsPrefix = new ArrayList<String>();
         String prefix = Play.configuration.getProperty("betterlogs.prefix",
-                "[%relativeFile:%line|%thread] %method(%signature) ::");
+                "[%relativeFile:%line|%thread] %method() ::");
         Matcher matcher = PREFIX_PATTERN.matcher(prefix);
         StringBuffer sb = new StringBuffer();
         if (matcher.find()) {
@@ -159,17 +159,6 @@ public class BetterLogsPlugin extends PlayPlugin {
                 betterLogsArgs[i] = signature;
             if ("thread".equals(argName))
                 betterLogsArgs[i] = thread.getId();
-            if ("tracetheme".equals(argName)) {
-                StringBuilder sb = new StringBuilder();
-                for (Object arg: args) {
-                    String s = (String)arg;
-                    if (traceThemes_.contains(s)) {
-                        if (sb.length() > 0) sb.append(",");
-                        sb.append(s);
-                    }
-                }
-                betterLogsArgs[i] = args.length > 0 ? sb.toString() : "ALL";
-            }
                 
             i++;
         }
@@ -284,10 +273,23 @@ public class BetterLogsPlugin extends PlayPlugin {
      * @param traceThemes
      * @return
      */
-    public static final boolean traceThemesMatch(String ... traceThemes) {
+    public static boolean traceThemesMatch(String ... traceThemes) {
+        if (traceThemes.length == 0) return true; // default trace theme
         for (String theme: traceThemes) {
             if (traceThemes_.contains(theme)) return true;
         }
         return false;
+    }
+    
+    public static String traceThemesString(String ... traceThemes) {
+        if (traceThemes.length == 0) return "_"; //default trace theme
+        StringBuilder sb = new StringBuilder();
+        for (String s: traceThemes) {
+            if (traceThemes_.contains(s)) {
+                if (sb.length() == 0) sb.append(s);
+                else sb.append(",").append(s);
+            }
+        }
+        return sb.toString();
     }
 }
