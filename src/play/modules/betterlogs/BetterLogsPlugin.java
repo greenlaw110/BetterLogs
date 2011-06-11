@@ -17,9 +17,12 @@ package play.modules.betterlogs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javassist.runtime.Desc;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
@@ -28,7 +31,7 @@ import play.classloading.enhancers.Enhancer;
 
 public class BetterLogsPlugin extends PlayPlugin {
     final static Pattern PREFIX_PATTERN = Pattern
-            .compile("%file|%line|%thread|%class|%method|%relativeFile|%simpleClass|%package|%signature");
+            .compile("%file|%line|%thread|%tracetheme|%class|%method|%relativeFile|%simpleClass|%package|%signature");
     final static Pattern TRAILING_SPACES_PATTERN = Pattern
             .compile("(\\d+)(t|ws)?");
 
@@ -63,7 +66,7 @@ public class BetterLogsPlugin extends PlayPlugin {
             Logger.trace("BetterLogs enabled");
         ArrayList<String> newArgsPrefix = new ArrayList<String>();
         String prefix = Play.configuration.getProperty("betterlogs.prefix",
-                "[%relativeFile:%line|%thread] %method() ::");
+                "[%relativeFile:%line|%thread] %method(%signature) ::");
         Matcher matcher = PREFIX_PATTERN.matcher(prefix);
         StringBuffer sb = new StringBuffer();
         if (matcher.find()) {
@@ -90,15 +93,11 @@ public class BetterLogsPlugin extends PlayPlugin {
         }
         argsPrefix = newArgsPrefix;
         stringFormatPrefix = sb.toString();
-
+        
         // enable trace?
         traceLevel = Play.configuration.getProperty("betterlogs.trace.level",
                 "TRACE");
-        java.util.logging.Level trace_ = toJuliLevel(traceLevel);
-        String logLevel = Play.configuration.getProperty("application.log",
-                "INFO");
-        java.util.logging.Level log_ = toJuliLevel(logLevel);
-        traceEnabled = log_.intValue() <= trace_.intValue();
+        traceEnabled = logEnabled(traceLevel);
         traceMethod = toLogMethod(traceLevel);
         
         String traceMode = Play.configuration.getProperty("betterlogs.trace.mode", "NOTRACE");
@@ -110,7 +109,22 @@ public class BetterLogsPlugin extends PlayPlugin {
         
         configured_ = true;
     }
-
+    
+    /*
+     * Compare the log level specified with the application.log level defined in application.conf
+     */
+    static boolean logEnabled(String level) {
+        java.util.logging.Level julLvl = toJuliLevel(level);
+        String appLevel = Play.configuration.getProperty("application.log", "INFO");
+        java.util.logging.Level julAppLvl = toJuliLevel(appLevel);
+        return julAppLvl.intValue() <= julLvl.intValue(); 
+    }
+    
+    @Override
+    public void onApplicationStart() {
+        Desc.useContextClassLoader = true;
+    }
+    
     public static void log(String level, String clazz, String clazzSimpleName,
             String packageName, String method, String signature,
             String fileName, String relativeFileName, int line, Object[] args) {
@@ -145,6 +159,18 @@ public class BetterLogsPlugin extends PlayPlugin {
                 betterLogsArgs[i] = signature;
             if ("thread".equals(argName))
                 betterLogsArgs[i] = thread.getId();
+            if ("tracetheme".equals(argName)) {
+                StringBuilder sb = new StringBuilder();
+                for (Object arg: args) {
+                    String s = (String)arg;
+                    if (traceThemes_.contains(s)) {
+                        if (sb.length() > 0) sb.append(",");
+                        sb.append(s);
+                    }
+                }
+                betterLogsArgs[i] = args.length > 0 ? sb.toString() : "ALL";
+            }
+                
             i++;
         }
         if ("trace".equals(level)) {
@@ -206,22 +232,22 @@ public class BetterLogsPlugin extends PlayPlugin {
      */
     private static java.util.logging.Level toJuliLevel(String level) {
         java.util.logging.Level juliLevel = java.util.logging.Level.INFO;
-        if (level.equals("ERROR") || level.equals("FATAL")) {
+        if (level.equalsIgnoreCase("ERROR") || level.equalsIgnoreCase("FATAL")) {
             return java.util.logging.Level.SEVERE;
         }
-        if (level.equals("WARN")) {
+        if (level.equalsIgnoreCase("WARN")) {
             return java.util.logging.Level.WARNING;
         }
-        if (level.equals("DEBUG")) {
+        if (level.equalsIgnoreCase("DEBUG")) {
             return java.util.logging.Level.FINE;
         }
-        if (level.equals("TRACE")) {
+        if (level.equalsIgnoreCase("TRACE")) {
             return java.util.logging.Level.FINEST;
         }
-        if (level.equals("ALL")) {
+        if (level.equalsIgnoreCase("ALL")) {
             return java.util.logging.Level.ALL;
         }
-        if (level.equals("OFF")) {
+        if (level.equalsIgnoreCase("OFF")) {
             return java.util.logging.Level.OFF;
         }
         return juliLevel;
@@ -235,5 +261,33 @@ public class BetterLogsPlugin extends PlayPlugin {
             return level.toLowerCase();
         }
         return "trace";
+    }
+    
+    private static Set<String> traceThemes_ = new HashSet<String>();
+    /**
+     * Set the trace theme at runtime
+     * 
+     * @param traceThemes
+     */
+    public static final void setTraceThemes(String ... traceThemes) {
+        traceThemes_.clear();
+        traceThemes_.addAll(Arrays.asList(traceThemes));
+    }
+    
+    /**
+     * Called by enhanced code to determine whether annotated trace themes
+     * match the the themes set with {@link #setTraceThemes(String...)}
+     * 
+     * <p>There there is any one theme found in both trace themes, then they
+     * are said to be matched and trace should be output
+     * 
+     * @param traceThemes
+     * @return
+     */
+    public static final boolean traceThemesMatch(String ... traceThemes) {
+        for (String theme: traceThemes) {
+            if (traceThemes_.contains(theme)) return true;
+        }
+        return false;
     }
 }

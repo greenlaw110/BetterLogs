@@ -18,8 +18,6 @@ package play.modules.betterlogs;
 import javassist.CannotCompileException;
 import javassist.CtBehavior;
 import javassist.CtClass;
-import javassist.CtConstructor;
-import javassist.CtMethod;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import play.Logger;
@@ -28,52 +26,75 @@ import play.classloading.enhancers.Enhancer;
 import play.modules.betterlogs.BetterLogsPlugin.TraceMode;
 
 public class BetterLogsEnhancer extends Enhancer {
-    
-    private boolean traceEnhance_(CtClass ctClass) {
-        return BetterLogsPlugin.traceEnabled && !ctClass.hasAnnotation(NoTrace.class);
+
+    private static boolean traceEnhance_(CtClass ctClass) {
+        return BetterLogsPlugin.traceEnabled
+                && !ctClass.hasAnnotation(NoTrace.class);
     }
-    
-    private boolean traceEnhance_(CtMethod ctMethod) {
-        return !ctMethod.isEmpty() && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctMethod.hasAnnotation(Trace.class) : !ctMethod.hasAnnotation(NoTrace.class));
+
+    private static boolean traceEnhance_(CtBehavior ctBehavior) {
+        return !ctBehavior.isEmpty()
+                && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctBehavior
+                        .hasAnnotation(Trace.class) : !ctBehavior
+                        .hasAnnotation(NoTrace.class));
     }
-    
-    private boolean traceEnhance_(CtConstructor ctConstructor) {
-        return ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctConstructor.hasAnnotation(Trace.class) : !ctConstructor.hasAnnotation(NoTrace.class));
+
+    private static void enhance_(CtClass cls, CtBehavior ctb,
+            String[] classTraceThemes, String traceMethod) throws Exception {
+        if (!traceEnhance_(ctb))
+            return;
+        // prefix
+        CtClass[] types = ctb.getParameterTypes();
+        int len = types.length;
+        StringBuilder sb;
+        if (len == 0) {
+            sb = new StringBuilder("Class[] types = new Class[0];");
+        } else {
+            sb = new StringBuilder("Class[] types = {");
+            for (int i = 0; i < len; ++i) {
+                if (i > 0)
+                    sb.append(", ");
+                sb.append(types[i].getName()).append(".class");
+            }
+            sb.append("};");
+        }
+        sb.append("java.lang.reflect.Method m = ")
+                .append(cls.getName())
+                .append(".class.getDeclaredMethod(\"")
+                .append(ctb.getName())
+                .append("\", types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
+                        + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
+                        + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
+                .append(traceMethod);
+        // entry
+        String code = sb.toString() + "(\"%s ...\", sa); }";
+        Logger.trace("betterlogs::trace: entry/exit code: %s", code);
+        ctb.insertBefore(String.format(code, "enter"));
+        // exit
+        ctb.insertAfter(String.format(code, "exit"));
     }
-    
+
     @Override
     public void enhanceThisClass(final ApplicationClass applicationClass)
             throws Exception {
         Logger.trace("BetterLogsEnhancer.enhanceThisClass: enter");
         final CtClass ctClass = makeClass(applicationClass);
-        if (ctClass.getName().matches(".*Plugin.*")) return;
-        if (ctClass.isInterface()) return;
-         
+        if (ctClass.getName().matches(".*Plugin.*"))
+            return;
+        if (ctClass.isInterface())
+            return;
+
         Logger.trace("BettterLogs: enhancing %s...", ctClass.getName());
         // entry/exit trace
         if (traceEnhance_(ctClass)) {
+            // class level trace theme
+            Object o = ctClass.getAnnotation(Trace.class);
+            String[] classTraceThemes = {};
+            if (null != o)
+                classTraceThemes = ((Trace) o).value();
             String traceMethod = BetterLogsPlugin.traceMethod;
-            for (final CtMethod ctMethod : ctClass.getDeclaredMethods()) {
-                if (!traceEnhance_(ctMethod)) continue;
-                // entry
-                String code = String.format("java.lang.String[] args = null; {play.Logger.%s(\"enter ...\", args);}",
-                        traceMethod);
-                ctMethod.insertBefore(code);
-                // exit
-                code = String.format("{java.lang.String[] args = null; play.Logger.%s(\"exit ...\", args);}",
-                        traceMethod);
-                ctMethod.insertAfter(code);
-            }
-            for (final CtConstructor ctConstructor: ctClass.getConstructors()) {
-                if (!traceEnhance_(ctConstructor)) continue;
-                //entry
-                String code = String.format("java.lang.String[] args = null; {play.Logger.%s(\"enter ...\", args);}",
-                        traceMethod);
-                ctConstructor.insertBefore(code);
-                // exit
-                code = String.format("{java.lang.String[] args = null; play.Logger.%s(\"exit ...\", args);}",
-                        traceMethod);
-                ctConstructor.insertAfter(code);
+            for (final CtBehavior behavior : ctClass.getDeclaredBehaviors()) {
+                enhance_(ctClass, behavior, classTraceThemes, traceMethod);
             }
             ctClass.defrost();
         }
