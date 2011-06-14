@@ -18,6 +18,7 @@ package play.modules.betterlogs;
 import javassist.CannotCompileException;
 import javassist.CtBehavior;
 import javassist.CtClass;
+import javassist.CtConstructor;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import play.Logger;
@@ -58,15 +59,19 @@ public class BetterLogsEnhancer extends Enhancer {
             }
             sb.append("};");
         }
-        sb.append("java.lang.reflect.Method m = ")
-                .append(cls.getName())
-                .append(".class.getDeclaredMethod(\"")
-                .append(ctb.getName())
-                .append("\", types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
-                        + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
-                        + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
-                .append(traceMethod)
-                .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
+        boolean isConstructor = ctb instanceof CtConstructor;
+        sb.append("java.lang.reflect.")
+            .append(isConstructor ? "Constructor" : "Method") 
+            .append(" m = ")
+            .append(cls.getName())
+            .append(isConstructor ? ".class.getDeclaredConstructor(" : ".class.getDeclaredMethod(\"")
+            .append(isConstructor ? "" : ctb.getName())
+            .append(isConstructor ? "" : "\", ")
+            .append("types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
+                    + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
+                    + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
+            .append(traceMethod)
+            .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
         // entry
         String code = sb.toString() + "\"]%s ...\", sa); }";
         Logger.trace("betterlogs::trace: entry/exit code: %s", code);
