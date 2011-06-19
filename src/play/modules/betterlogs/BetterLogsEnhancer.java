@@ -77,7 +77,7 @@ public class BetterLogsEnhancer extends Enhancer {
         Logger.trace("betterlogs::trace: entry/exit code: %s", code);
         ctb.insertBefore(String.format(code, "enter"));
         // exit
-        ctb.insertAfter(String.format(code, "exit"));
+        ctb.insertAfter(String.format(code, "exit"), true);
     }
 
     @Override
