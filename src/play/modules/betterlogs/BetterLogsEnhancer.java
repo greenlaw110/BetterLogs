@@ -16,9 +16,14 @@
 package play.modules.betterlogs;
 
 import javassist.CannotCompileException;
+import javassist.ClassPool;
 import javassist.CtBehavior;
 import javassist.CtClass;
 import javassist.CtConstructor;
+import javassist.bytecode.AnnotationsAttribute;
+import javassist.bytecode.ClassFile;
+import javassist.bytecode.MethodInfo;
+import javassist.bytecode.annotation.Annotation;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import play.Logger;
@@ -28,16 +33,104 @@ import play.modules.betterlogs.BetterLogsPlugin.TraceMode;
 
 public class BetterLogsEnhancer extends Enhancer {
 
+    private static boolean hasAnnotationType_(Class<?> clz, ClassPool cp,
+            AnnotationsAttribute a1, AnnotationsAttribute a2) {
+        Annotation[] anno1, anno2;
+
+        if (a1 == null)
+            anno1 = null;
+        else
+            anno1 = a1.getAnnotations();
+
+        if (a2 == null)
+            anno2 = null;
+        else
+            anno2 = a2.getAnnotations();
+
+        String typeName = clz.getName();
+        if (anno1 != null)
+            for (int i = 0; i < anno1.length; i++)
+                if (anno1[i].getTypeName().equals(typeName))
+                    return true;
+
+        if (anno2 != null)
+            for (int i = 0; i < anno2.length; i++)
+                if (anno2[i].getTypeName().equals(typeName))
+                    return true;
+
+        return false;
+    }
+
+    private static Object toAnnoType_(Annotation anno, ClassPool cp)
+            throws ClassNotFoundException {
+        try {
+            ClassLoader cl = cp.getClassLoader();
+            return anno.toAnnotationType(cl, cp);
+        } catch (ClassNotFoundException e) {
+            ClassLoader cl2 = cp.getClass().getClassLoader();
+            return anno.toAnnotationType(cl2, cp);
+        }
+    }
+
+    private static Object getAnnotationType_(Class<?> clz, ClassPool cp,
+            AnnotationsAttribute a1, AnnotationsAttribute a2)
+            throws ClassNotFoundException {
+        Annotation[] anno1, anno2;
+
+        if (a1 == null)
+            anno1 = null;
+        else
+            anno1 = a1.getAnnotations();
+
+        if (a2 == null)
+            anno2 = null;
+        else
+            anno2 = a2.getAnnotations();
+
+        String typeName = clz.getName();
+        if (anno1 != null)
+            for (int i = 0; i < anno1.length; i++)
+                if (anno1[i].getTypeName().equals(typeName))
+                    return toAnnoType_(anno1[i], cp);
+
+        if (anno2 != null)
+            for (int i = 0; i < anno2.length; i++)
+                if (anno2[i].getTypeName().equals(typeName))
+                    return toAnnoType_(anno2[i], cp);
+
+        return null;
+    }
+
+    private static boolean hasAnnotation_(CtClass ctClass, Class<?> annType) {
+        ClassFile cf = ctClass.getClassFile2();
+        AnnotationsAttribute ainfo = (AnnotationsAttribute) cf
+                .getAttribute(AnnotationsAttribute.invisibleTag);
+        AnnotationsAttribute ainfo2 = (AnnotationsAttribute) cf
+                .getAttribute(AnnotationsAttribute.visibleTag);
+        return hasAnnotationType_(annType, ctClass.getClassPool(), ainfo,
+                ainfo2);
+    }
+
+    private static boolean hasAnnotation_(CtBehavior ctBehavior,
+            Class<?> annType) {
+        MethodInfo mi = ctBehavior.getMethodInfo2();
+        AnnotationsAttribute ainfo = (AnnotationsAttribute) mi
+                .getAttribute(AnnotationsAttribute.invisibleTag);
+        AnnotationsAttribute ainfo2 = (AnnotationsAttribute) mi
+                .getAttribute(AnnotationsAttribute.visibleTag);
+        return hasAnnotationType_(annType, ctBehavior.getDeclaringClass()
+                .getClassPool(), ainfo, ainfo2);
+    }
+
     private static boolean traceEnhance_(CtClass ctClass) {
         return BetterLogsPlugin.traceEnabled
-                && !ctClass.hasAnnotation(NoTrace.class);
+                && !hasAnnotation_(ctClass, NoTrace.class);
     }
 
     private static boolean traceEnhance_(CtBehavior ctBehavior) {
         return !ctBehavior.isEmpty()
-                && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? ctBehavior
-                        .hasAnnotation(Trace.class) : !ctBehavior
-                        .hasAnnotation(NoTrace.class));
+                && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? 
+                        hasAnnotation_(ctBehavior, Trace.class) : !hasAnnotation_(ctBehavior, NoTrace.class));
     }
 
     private static void enhance_(CtClass cls, CtBehavior ctb,
@@ -61,23 +154,37 @@ public class BetterLogsEnhancer extends Enhancer {
         }
         boolean isConstructor = ctb instanceof CtConstructor;
         sb.append("java.lang.reflect.")
-            .append(isConstructor ? "Constructor" : "Method") 
-            .append(" m = ")
-            .append(cls.getName())
-            .append(isConstructor ? ".class.getDeclaredConstructor(" : ".class.getDeclaredMethod(\"")
-            .append(isConstructor ? "" : ctb.getName())
-            .append(isConstructor ? "" : "\", ")
-            .append("types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
-                    + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
-                    + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
-            .append(traceMethod)
-            .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
+                .append(isConstructor ? "Constructor" : "Method")
+                .append(" m = ")
+                .append(cls.getName())
+                .append(isConstructor ? ".class.getDeclaredConstructor("
+                        : ".class.getDeclaredMethod(\"")
+                .append(isConstructor ? "" : ctb.getName())
+                .append(isConstructor ? "" : "\", ")
+                .append("types);java.lang.annotation.Annotation a = m.getAnnotation(play.modules.betterlogs.Trace.class);"
+                        + "String[] sa = new String[]{\"\"};if (null != a) sa = ((play.modules.betterlogs.Trace)a).value(); "
+                        + "if (play.modules.betterlogs.BetterLogsPlugin.traceThemesMatch(sa) || ((sa.length == 1) && \"\".equals(sa[0]))){ play.Logger.")
+                .append(traceMethod)
+                .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
         // entry
         String code = sb.toString() + "\"]%s ...\", sa); }";
         Logger.trace("betterlogs::trace: entry/exit code: %s", code);
         ctb.insertBefore(String.format(code, "enter"));
         // exit
         ctb.insertAfter(String.format(code, "exit"), true);
+    }
+
+    /*
+     * This could be replaced with ctClass.getAnnotation once play has upgraded
+     * javassis lib to version > 3.10
+     */
+    private Object getAnnotation_(CtClass ctClass, Class<?> annType) throws ClassNotFoundException {
+        ClassFile cf = ctClass.getClassFile2();
+        AnnotationsAttribute ainfo = (AnnotationsAttribute)
+                cf.getAttribute(AnnotationsAttribute.invisibleTag);  
+        AnnotationsAttribute ainfo2 = (AnnotationsAttribute)
+                cf.getAttribute(AnnotationsAttribute.visibleTag);  
+        return getAnnotationType_(annType, ctClass.getClassPool(), ainfo, ainfo2);
     }
 
     @Override
@@ -94,7 +201,7 @@ public class BetterLogsEnhancer extends Enhancer {
         // entry/exit trace
         if (traceEnhance_(ctClass)) {
             // class level trace theme
-            Object o = ctClass.getAnnotation(Trace.class);
+            Object o = getAnnotation_(ctClass, Trace.class);
             String[] classTraceThemes = {};
             if (null != o)
                 classTraceThemes = ((Trace) o).value();
