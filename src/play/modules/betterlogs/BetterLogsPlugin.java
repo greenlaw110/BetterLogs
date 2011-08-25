@@ -15,6 +15,7 @@
  */
 package play.modules.betterlogs;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -30,6 +31,39 @@ import play.classloading.ApplicationClasses.ApplicationClass;
 import play.classloading.enhancers.Enhancer;
 
 public class BetterLogsPlugin extends PlayPlugin {
+    
+    /**
+     * config whether betterlogs enabled or disabled
+     */
+    public static final String CONF_DISABLED = "betterlogs.disabled";
+    /**
+     * Config the prefix of log output. Default to "[%relativeFile:%line|%thread] %method() ::"
+     */
+    public static final String CONF_PREFIX = "betterlogs.prefix";
+    /**
+     * Config the trailing spaces after prefix. Default to "1ws"
+     */
+    public static final String CONF_PREFIX_TRAILINGSPACES = "betterlogs.prefix.trailingSpaces";
+    /**
+     * Config the Log Level of trace. Default to "trace"
+     */
+    public static final String CONF_TRACE_LEVEL = "betterlogs.trace.level";
+    /**
+     * config the trace theme, could be multiple themes separated by ","
+     */
+    public static final String CONF_TRACE_THEME = "betterlogs.trace.theme";
+    /**
+     * config whether set trace themes (configured with {@link CONF_TRACE_THEME}) each time before
+     * actions been invoked. Default to false
+     */
+    public static final String CONF_TRACE_SET_THEME = "betterlogs.trace.setThemes";
+    /**
+     * Set trace mode. Default to "NOTRACE"
+     * - NOTRACE: trace enhancement only to class/method/constructor been annotated with @Trace explicitly
+     * - TRACE: trace enhancement to all class/method/constructor with no @NoTrace annotation
+     */
+    public static final String CONF_TRACE_MODE = "betterlogs.trace.mode";
+
     final static Pattern PREFIX_PATTERN = Pattern
             .compile("%file|%line|%thread|%class|%method|%relativeFile|%simpleClass|%package|%signature");
     final static Pattern TRAILING_SPACES_PATTERN = Pattern
@@ -41,6 +75,7 @@ public class BetterLogsPlugin extends PlayPlugin {
 
     private static Enhancer e_ = new BetterLogsEnhancer();
     static boolean traceEnabled = false;
+    static boolean setTraceThemes = false;
     static String traceLevel = "TRACE";
     static String traceMethod = "trace";
     static TraceMode traceMode = TraceMode.NOTRACE;
@@ -59,13 +94,13 @@ public class BetterLogsPlugin extends PlayPlugin {
     public void onConfigurationRead() {
         if (configured_) return;
         disabled = "true".equals(Play.configuration
-                .getProperty("betterlogs.disabled"));
+                .getProperty(CONF_DISABLED));
         if (disabled)
             Logger.warn("BetterLogs is disabled. The classes are no more enhanced. If you enable it again, don't forget to clean your app before to force Play to enhance all the classes.");
         else
             Logger.trace("BetterLogs enabled");
         ArrayList<String> newArgsPrefix = new ArrayList<String>();
-        String prefix = Play.configuration.getProperty("betterlogs.prefix",
+        String prefix = Play.configuration.getProperty(CONF_PREFIX,
                 "[%relativeFile:%line|%thread] %method() ::");
         Matcher matcher = PREFIX_PATTERN.matcher(prefix);
         StringBuffer sb = new StringBuffer();
@@ -81,7 +116,7 @@ public class BetterLogsPlugin extends PlayPlugin {
             sb.append(prefix.substring(lastEnd));
         }
         String trailingSpaces = Play.configuration.getProperty(
-                "betterlogs.prefix.trailingSpaces", "1ws");
+                CONF_PREFIX_TRAILINGSPACES, "1ws");
         matcher = TRAILING_SPACES_PATTERN.matcher(trailingSpaces);
         if (matcher.matches()) {
             int nb = Integer.parseInt(matcher.group(1));
@@ -95,21 +130,42 @@ public class BetterLogsPlugin extends PlayPlugin {
         stringFormatPrefix = sb.toString();
         
         // enable trace?
-        traceLevel = Play.configuration.getProperty("betterlogs.trace.level",
+        traceLevel = Play.configuration.getProperty(CONF_TRACE_LEVEL,
                 "TRACE");
         traceEnabled = logEnabled(traceLevel);
         traceMethod = toLogMethod(traceLevel);
         
-        String traceMode = Play.configuration.getProperty("betterlogs.trace.mode", "NOTRACE");
-        try {
-            BetterLogsPlugin.traceMode = TraceMode.valueOf(TraceMode.class, traceMode);
-        } catch (Exception e) {
-            Logger.warn("invalid tracemode found in config: %s. BetterLogs trace mode set to NOTRACE", traceMode);
+        if (traceEnabled) {
+            String s = Play.configuration.getProperty(CONF_TRACE_MODE, "NOTRACE");
+            try {
+                traceMode = TraceMode.valueOf(TraceMode.class, s);
+            } catch (Exception e) {
+                Logger.warn("invalid tracemode found in config: %s. BetterLogs trace mode set to NOTRACE", traceMode);
+            }
+            s = Play.configuration.getProperty(CONF_TRACE_SET_THEME, "false");
+            setTraceThemes = Boolean.valueOf(s);
         }
         
         configured_ = true;
     }
     
+    
+    @Override
+    public void beforeActionInvocation(Method actionMethod) {
+        trace_(traceMethod, "--------------------------- BL: Before Action Invocation ----------------------------");
+        if (setTraceThemes && traceEnabled) {
+            String s = Play.configuration.getProperty(CONF_TRACE_THEME);
+            if (null != s) {
+                setTraceThemes(s.split(","));
+            }
+        }
+    }
+    
+    @Override
+    public void afterActionInvocation() {
+        trace_(traceMethod, "--------------------------- BL: EOF Action Invocation ----------------------------");
+    }
+
     /*
      * Compare the log level specified with the application.log level defined in application.conf
      */
@@ -123,6 +179,25 @@ public class BetterLogsPlugin extends PlayPlugin {
     @Override
     public void onApplicationStart() {
         Desc.useContextClassLoader = true;
+    }
+    
+    private static void trace_(String level, String message, Object ... args) {
+        if (!traceEnabled) return;
+        if ("trace".equalsIgnoreCase(level)) {
+            Logger.trace(message, args);
+        } else if ("debug".equalsIgnoreCase(level)) {
+            Logger.debug(message, args);
+        } else if ("info".equalsIgnoreCase(level)) {
+            Logger.info(message, args);
+        } else if ("warn".equalsIgnoreCase(level)) {
+            Logger.warn(message, args);
+        } else if ("error".equalsIgnoreCase(level)) {
+            Logger.error(message, args);
+        } else if ("fatal".equalsIgnoreCase(level)) {
+            Logger.fatal(message, args);
+        } else {
+            Logger.debug(message, args);
+        }
     }
     
     public static void log(String level, String clazz, String clazzSimpleName,
