@@ -12,7 +12,30 @@ h2. How To Use It
 * If you use Play! 1.2 or above, you can add it to your dependancies
 * Customize the log pattern if you want
 * Trace your app with @Trace({"theme1", "theme2"}) marked on the ap methods
-* BetterLogsPlugin.setTraceThemes("theme1",...) to set which trace theme will be output
+* Set trace theme by either
+** call BetterLogsPlugin.setTraceThemes("theme1",...), or
+** configure betterlogs.trace.theme and set betterlogs.trace.setThemes to true
+
+h3. More about trace theme
+
+p. Usually trace should be open only when you want to debug some logic error at certain aspect of an application.
+E.g. the order processing workflow, or authorization process. Trace theme could be used to help you focus on
+only the aspect of your application that you want to observe. To use trace theme, you need to:
+
+* Annotate function with relevant trace theme. E.g. @Trace('order') public static void handleNewOrder() {...}
+* Set "betterlogs.trace.mode" to "NOTRACE", which means by default function trace is turned off unless it's annotated with @Trace
+* Set "betterlogs.trace.setThemes" to true
+* Set "betterlogs.trace.level" to any log level higher or equals to "application.log"
+* Update "betterlogs.trace.theme" to the theme you want to trace, e.g. "order,authentication".
+
+p. After you've done with above, the system will log the entry and exit of functions you want to trace, like follows:
+
+bq. 22:37:49,603 DEBUG  ~ --------------------------- BL: Before Action Invocation ----------------------------
+22:37:49,621 DEBUG  ~ [/app/controllers/Orders.java:89|14] handleNewOrder() :: [order]enter ...
+22:37:49,626 DEBUG  ~ [/app/controllers/Orders.java:33|14] checkPermission() :: [order]enter ...
+22:37:49,627 DEBUG  ~ [/app/controllers/Orders.java:36|14] checkPermission() :: [order]exit ...
+22:37:50,261 DEBUG  ~ [/app/controllers/Orders.java:92|14] handleNewOrder() :: [order]exit ...
+22:37:50,262 DEBUG  ~ --------------------------- BL: EOF Action Invocation -----------------------------
 
 h3. Example
 
