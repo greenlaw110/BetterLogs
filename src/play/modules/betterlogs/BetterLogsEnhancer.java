@@ -101,7 +101,7 @@ public class BetterLogsEnhancer extends Enhancer {
         return null;
     }
 
-    private static boolean hasAnnotation_(CtClass ctClass, Class<?> annType) {
+    public static boolean hasAnnotation(CtClass ctClass, Class<?> annType) {
         ClassFile cf = ctClass.getClassFile2();
         AnnotationsAttribute ainfo = (AnnotationsAttribute) cf
                 .getAttribute(AnnotationsAttribute.invisibleTag);
@@ -111,7 +111,7 @@ public class BetterLogsEnhancer extends Enhancer {
                 ainfo2);
     }
 
-    private static boolean hasAnnotation_(CtBehavior ctBehavior,
+    public static boolean hasAnnotation(CtBehavior ctBehavior,
             Class<?> annType) {
         MethodInfo mi = ctBehavior.getMethodInfo2();
         AnnotationsAttribute ainfo = (AnnotationsAttribute) mi
@@ -124,13 +124,13 @@ public class BetterLogsEnhancer extends Enhancer {
 
     private static boolean traceEnhance_(CtClass ctClass) {
         return BetterLogsPlugin.traceEnabled
-                && !hasAnnotation_(ctClass, NoTrace.class);
+                && !hasAnnotation(ctClass, NoTrace.class);
     }
 
     private static boolean traceEnhance_(CtBehavior ctBehavior) {
         return !ctBehavior.isEmpty()
                 && ((BetterLogsPlugin.traceMode == TraceMode.NOTRACE) ? 
-                        hasAnnotation_(ctBehavior, Trace.class) : !hasAnnotation_(ctBehavior, NoTrace.class));
+                        hasAnnotation(ctBehavior, Trace.class) : !hasAnnotation(ctBehavior, NoTrace.class));
     }
 
     private static void enhance_(CtClass cls, CtBehavior ctb,
@@ -174,17 +174,22 @@ public class BetterLogsEnhancer extends Enhancer {
         ctb.insertAfter(String.format(code, "exit"), true);
     }
 
-    /*
-     * This could be replaced with ctClass.getAnnotation once play has upgraded
-     * javassis lib to version > 3.10
-     */
-    private Object getAnnotation_(CtClass ctClass, Class<?> annType) throws ClassNotFoundException {
+    public static Object getAnnotation(CtClass ctClass, Class<?> annType) throws ClassNotFoundException {
         ClassFile cf = ctClass.getClassFile2();
         AnnotationsAttribute ainfo = (AnnotationsAttribute)
                 cf.getAttribute(AnnotationsAttribute.invisibleTag);  
         AnnotationsAttribute ainfo2 = (AnnotationsAttribute)
                 cf.getAttribute(AnnotationsAttribute.visibleTag);  
         return getAnnotationType_(annType, ctClass.getClassPool(), ainfo, ainfo2);
+    }
+
+    public static Object getAnnotation(CtBehavior ctBehavior, Class<?> annType) throws ClassNotFoundException {
+        MethodInfo mi = ctBehavior.getMethodInfo2();
+        AnnotationsAttribute ainfo = (AnnotationsAttribute)
+                    mi.getAttribute(AnnotationsAttribute.invisibleTag);  
+        AnnotationsAttribute ainfo2 = (AnnotationsAttribute)
+                    mi.getAttribute(AnnotationsAttribute.visibleTag);  
+        return getAnnotationType_(annType, ctBehavior.getDeclaringClass().getClassPool(), ainfo, ainfo2);
     }
 
     @Override
@@ -201,7 +206,7 @@ public class BetterLogsEnhancer extends Enhancer {
         // entry/exit trace
         if (traceEnhance_(ctClass)) {
             // class level trace theme
-            Object o = getAnnotation_(ctClass, Trace.class);
+            Object o = getAnnotation(ctClass, Trace.class);
             String[] classTraceThemes = {};
             if (null != o)
                 classTraceThemes = ((Trace) o).value();
