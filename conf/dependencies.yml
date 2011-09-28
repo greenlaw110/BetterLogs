@@ -1,0 +1,7 @@
+# Version history
+# 1.2b - display request action at beginning and end of action invokation
+# 1.2a - Track time spend in each method
+self: play -> betterlogs 1.2b
+
+require:
+    - play 1.2

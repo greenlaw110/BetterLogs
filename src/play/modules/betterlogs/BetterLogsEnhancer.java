@@ -15,6 +15,8 @@
  */
 package play.modules.betterlogs;
 
+import java.util.Stack;
+
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtBehavior;
@@ -140,11 +142,11 @@ public class BetterLogsEnhancer extends Enhancer {
         // prefix
         CtClass[] types = ctb.getParameterTypes();
         int len = types.length;
-        StringBuilder sb;
+        StringBuilder sb = new StringBuilder("%sClass[] types = ");
         if (len == 0) {
-            sb = new StringBuilder("Class[] types = new Class[0];");
+            sb.append("new Class[0];");
         } else {
-            sb = new StringBuilder("Class[] types = {");
+            sb.append("{");
             for (int i = 0; i < len; ++i) {
                 if (i > 0)
                     sb.append(", ");
@@ -167,13 +169,14 @@ public class BetterLogsEnhancer extends Enhancer {
                 .append(traceMethod)
                 .append("(\"[\" + play.modules.betterlogs.BetterLogsPlugin.traceThemesString(sa) + ");
         // entry
-        String code = sb.toString() + "\"]%s ...\", sa); }";
-        Logger.trace("betterlogs::trace: entry/exit code: %s", code);
-        ctb.insertBefore(String.format(code, "enter"));
+        String code = sb.toString() + "\"]%s%s ...\", sa); }";
+        Logger.trace("betterlogs::trace: entry/exit code: %s:", code);
+        ctb.insertBefore(String.format(code, "play.modules.betterlogs.TimeTracker.enter();", "enter", ""));
         // exit
-        ctb.insertAfter(String.format(code, "exit"), true);
+        ctb.insertAfter(String.format(code, "", "exit", ": \" + play.modules.betterlogs.TimeTracker.exit() + \"ms"), true);
+        
     }
-
+    
     public static Object getAnnotation(CtClass ctClass, Class<?> annType) throws ClassNotFoundException {
         ClassFile cf = ctClass.getClassFile2();
         AnnotationsAttribute ainfo = (AnnotationsAttribute)

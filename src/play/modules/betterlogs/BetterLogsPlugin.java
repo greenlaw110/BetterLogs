@@ -29,6 +29,7 @@ import play.Play;
 import play.PlayPlugin;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.classloading.enhancers.Enhancer;
+import play.mvc.Http.Request;
 
 public class BetterLogsPlugin extends PlayPlugin {
     
@@ -152,7 +153,8 @@ public class BetterLogsPlugin extends PlayPlugin {
     
     @Override
     public void beforeActionInvocation(Method actionMethod) {
-        trace_(traceMethod, "--------------------------- BL: Before Action Invocation ----------------------------");
+        trace_(traceMethod, "----");
+        trace_(traceMethod, "[BL]>>>>: Before Action[%s] Invocation ", Request.current().action);
         if (setTraceThemes && traceEnabled) {
             String s = Play.configuration.getProperty(CONF_TRACE_THEME);
             if (null != s) {
@@ -163,7 +165,9 @@ public class BetterLogsPlugin extends PlayPlugin {
     
     @Override
     public void afterActionInvocation() {
-        trace_(traceMethod, "--------------------------- BL: EOF Action Invocation ----------------------------");
+        trace_(traceMethod, "[BL]>>>>: EOF Action[%s] Invocation ", Request.current().action);
+        trace_(traceMethod, "");
+        trace_(traceMethod, "");
     }
 
     /*
