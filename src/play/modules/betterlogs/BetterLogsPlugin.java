@@ -150,23 +150,25 @@ public class BetterLogsPlugin extends PlayPlugin {
         configured_ = true;
     }
     
-    
+    private static final ThreadLocal<Long> perf_ = new ThreadLocal<Long>();
     @Override
     public void beforeActionInvocation(Method actionMethod) {
-        trace_(traceMethod, "----");
-        trace_(traceMethod, "[BL]>>>>: Before Action[%s] Invocation ", Request.current().action);
-        if (setTraceThemes && traceEnabled) {
-            String s = Play.configuration.getProperty(CONF_TRACE_THEME);
-            if (null != s) {
-                setTraceThemes(s.split(","));
-            }
+        if (!(setTraceThemes && traceEnabled)) return;
+        perf_.set(System.currentTimeMillis());
+        trace_(traceMethod, "");
+        trace_(traceMethod, "[BL]>>>>>>>: Begin Action[%s] Invocation ", Request.current().action);
+        String s = Play.configuration.getProperty(CONF_TRACE_THEME);
+        if (null != s) {
+            setTraceThemes(s.split(","));
         }
     }
     
     @Override
     public void afterActionInvocation() {
-        trace_(traceMethod, "[BL]>>>>: EOF Action[%s] Invocation ", Request.current().action);
-        trace_(traceMethod, "");
+        if (!(setTraceThemes && traceEnabled)) return;
+        long start = perf_.get(), ms = System.currentTimeMillis() - start;
+        perf_.remove();
+        trace_(traceMethod, "[BL]<<<<<<<: END Action[%s] Invocation | %sms", Request.current().action, ms);
         trace_(traceMethod, "");
     }
 
