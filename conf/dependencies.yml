@@ -1,8 +1,10 @@
 # Version history
+# 1.2e - support LOG_ACTION_INVOCATION and LOG_ACTION_INVOCATION_TIME configuration
+# 1.2d - support @Trace("theme1 theme2, theme3") style
 # 1.2c - display time spend on each action invocation
 # 1.2b - display requested action at beginning and end of action invokation
 # 1.2a - Track time spend in each method
-self: play -> betterlogs 1.2c
+self: play -> betterlogs 1.2e
 
 require:
     - play 1.2

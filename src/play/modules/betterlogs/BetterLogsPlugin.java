@@ -54,6 +54,14 @@ public class BetterLogsPlugin extends PlayPlugin {
      */
     public static final String CONF_TRACE_THEME = "betterlogs.trace.theme";
     /**
+     * config whether to log action invokation
+     */
+    public static final String CONF_LOG_ACTION_INVOCATION = "betterlogs.trace.actionInvocation";
+    /**
+     * config whether to log action invocation time
+     */
+    public static final String CONF_LOG_ACTION_INVOCATION_TIME = "betterlogs.trace.actionInvocation.time";
+    /**
      * config whether set trace themes (configured with {@link CONF_TRACE_THEME}) each time before
      * actions been invoked. Default to false
      */
@@ -77,6 +85,8 @@ public class BetterLogsPlugin extends PlayPlugin {
     private static Enhancer e_ = new BetterLogsEnhancer();
     static boolean traceEnabled = false;
     static boolean setTraceThemes = false;
+    static boolean logActionInvocation = false;
+    static boolean logActionInvocationTime = false;
     static String traceLevel = "TRACE";
     static String traceMethod = "trace";
     static TraceMode traceMode = TraceMode.NOTRACE;
@@ -147,29 +157,46 @@ public class BetterLogsPlugin extends PlayPlugin {
             setTraceThemes = Boolean.valueOf(s);
         }
         
+        logActionInvocationTime = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION_TIME, "false"));
+        logActionInvocation = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION, "true"));
+        
         configured_ = true;
     }
     
     private static final ThreadLocal<Long> perf_ = new ThreadLocal<Long>();
     @Override
     public void beforeActionInvocation(Method actionMethod) {
-        if (!(setTraceThemes && traceEnabled)) return;
-        perf_.set(System.currentTimeMillis());
-        trace_(traceMethod, "");
-        trace_(traceMethod, "[BL]>>>>>>>: Begin Action[%s] Invocation ", Request.current().action);
-        String s = Play.configuration.getProperty(CONF_TRACE_THEME);
-        if (null != s) {
-            setTraceThemes(s.split(","));
+        if (logActionInvocation) {
+            Logger.info("");
+            Logger.info("[BL]>>>>>>> [%s]", Request.current().action);
+            if (logActionInvocationTime) perf_.set(System.currentTimeMillis());
+        }
+        if (setTraceThemes && traceEnabled){
+            String s = Play.configuration.getProperty(CONF_TRACE_THEME, "__DEF__").intern();
+            if (!"__DEF__".equals(s)) {
+                setTraceThemes(s.split(","));
+            }
         }
     }
     
     @Override
     public void afterActionInvocation() {
+        if (logActionInvocation) {
+            if (logActionInvocationTime) {
+                long start = perf_.get(), ms = System.currentTimeMillis() - start;
+                perf_.remove();
+                Logger.info("[BL]<<<<<<< [%s]: %sms", Request.current().action, ms);
+            } else {
+                Logger.info("[BL]<<<<<<< [%s]", Request.current().action);
+            }
+            Logger.info("");
+        }
         if (!(setTraceThemes && traceEnabled)) return;
-        long start = perf_.get(), ms = System.currentTimeMillis() - start;
+    }
+    
+    @Override
+    public void onInvocationException(Throwable e) {
         perf_.remove();
-        trace_(traceMethod, "[BL]<<<<<<<: END Action[%s] Invocation | %sms", Request.current().action, ms);
-        trace_(traceMethod, "");
     }
 
     /*
@@ -177,7 +204,7 @@ public class BetterLogsPlugin extends PlayPlugin {
      */
     static boolean logEnabled(String level) {
         java.util.logging.Level julLvl = toJuliLevel(level);
-        String appLevel = Play.configuration.getProperty("application.log", "INFO");
+        String appLevel = Play.configuration.getProperty("application.log", "INFO").intern();
         java.util.logging.Level julAppLvl = toJuliLevel(appLevel);
         return julAppLvl.intValue() <= julLvl.intValue(); 
     }
@@ -187,24 +214,24 @@ public class BetterLogsPlugin extends PlayPlugin {
         Desc.useContextClassLoader = true;
     }
     
-    private static void trace_(String level, String message, Object ... args) {
-        if (!traceEnabled) return;
-        if ("trace".equalsIgnoreCase(level)) {
-            Logger.trace(message, args);
-        } else if ("debug".equalsIgnoreCase(level)) {
-            Logger.debug(message, args);
-        } else if ("info".equalsIgnoreCase(level)) {
-            Logger.info(message, args);
-        } else if ("warn".equalsIgnoreCase(level)) {
-            Logger.warn(message, args);
-        } else if ("error".equalsIgnoreCase(level)) {
-            Logger.error(message, args);
-        } else if ("fatal".equalsIgnoreCase(level)) {
-            Logger.fatal(message, args);
-        } else {
-            Logger.debug(message, args);
-        }
-    }
+//    private static void trace_(String level, String message, Object ... args) {
+//        if (!traceEnabled) return;
+//        if ("trace".equalsIgnoreCase(level)) {
+//            Logger.trace(message, args);
+//        } else if ("debug".equalsIgnoreCase(level)) {
+//            Logger.debug(message, args);
+//        } else if ("info".equalsIgnoreCase(level)) {
+//            Logger.info(message, args);
+//        } else if ("warn".equalsIgnoreCase(level)) {
+//            Logger.warn(message, args);
+//        } else if ("error".equalsIgnoreCase(level)) {
+//            Logger.error(message, args);
+//        } else if ("fatal".equalsIgnoreCase(level)) {
+//            Logger.fatal(message, args);
+//        } else {
+//            Logger.debug(message, args);
+//        }
+//    }
     
     public static void log(String level, String clazz, String clazzSimpleName,
             String packageName, String method, String signature,
@@ -334,6 +361,15 @@ public class BetterLogsPlugin extends PlayPlugin {
     }
     
     private static Set<String> traceThemes_ = new HashSet<String>();
+
+    private static Set<String> strs_(String... traceThemes) {
+        Set<String> set = new HashSet<String>();
+        for (String s: traceThemes) {
+            set.addAll(Arrays.asList(s.split("[\\s+,;:]+")));
+        }
+        return set;
+    }
+    
     /**
      * Set the trace theme at runtime
      * 
@@ -341,7 +377,7 @@ public class BetterLogsPlugin extends PlayPlugin {
      */
     public static final void setTraceThemes(String ... traceThemes) {
         traceThemes_.clear();
-        traceThemes_.addAll(Arrays.asList(traceThemes));
+        traceThemes_.addAll(strs_(traceThemes));
     }
     
     /**
@@ -356,7 +392,7 @@ public class BetterLogsPlugin extends PlayPlugin {
      */
     public static boolean traceThemesMatch(String ... traceThemes) {
         if (traceThemes.length == 0) return true; // default trace theme
-        for (String theme: traceThemes) {
+        for (String theme: strs_(traceThemes)) {
             if (traceThemes_.contains(theme)) return true;
         }
         return false;
@@ -365,7 +401,7 @@ public class BetterLogsPlugin extends PlayPlugin {
     public static String traceThemesString(String ... traceThemes) {
         if (traceThemes.length == 0) return "_"; //default trace theme
         StringBuilder sb = new StringBuilder();
-        for (String s: traceThemes) {
+        for (String s: strs_(traceThemes)) {
             if (traceThemes_.contains(s)) {
                 if (sb.length() == 0) sb.append(s);
                 else sb.append(",").append(s);

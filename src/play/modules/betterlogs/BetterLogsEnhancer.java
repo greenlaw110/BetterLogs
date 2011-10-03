@@ -15,8 +15,6 @@
  */
 package play.modules.betterlogs;
 
-import java.util.Stack;
-
 import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtBehavior;
