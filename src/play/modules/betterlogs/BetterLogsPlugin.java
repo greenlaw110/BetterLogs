@@ -163,13 +163,14 @@ public class BetterLogsPlugin extends PlayPlugin {
         configured_ = true;
     }
     
-    private static final ThreadLocal<Long> perf_ = new ThreadLocal<Long>();
+    //private static final ThreadLocal<Long> perf_ = new ThreadLocal<Long>();
+    private static final String KEY = "__BL_COUNTER__";
     @Override
     public void beforeActionInvocation(Method actionMethod) {
         if (logActionInvocation) {
             Logger.info("");
             Logger.info("[BL]>>>>>>> [%s]", Request.current().action);
-            if (logActionInvocationTime) perf_.set(System.currentTimeMillis());
+            if (logActionInvocationTime) Request.current().args.put(KEY, System.currentTimeMillis());
         }
         if (setTraceThemes && traceEnabled){
             String s = Play.configuration.getProperty(CONF_TRACE_THEME, "__DEF__").intern();
@@ -183,8 +184,7 @@ public class BetterLogsPlugin extends PlayPlugin {
     public void afterActionInvocation() {
         if (logActionInvocation) {
             if (logActionInvocationTime) {
-                long start = perf_.get(), ms = System.currentTimeMillis() - start;
-                perf_.remove();
+                long start = (Long)Request.current().args.get(KEY), ms = System.currentTimeMillis() - start;
                 Logger.info("[BL]<<<<<<< [%s]: %sms", Request.current().action, ms);
             } else {
                 Logger.info("[BL]<<<<<<< [%s]", Request.current().action);
@@ -194,11 +194,6 @@ public class BetterLogsPlugin extends PlayPlugin {
         if (!(setTraceThemes && traceEnabled)) return;
     }
     
-    @Override
-    public void onInvocationException(Throwable e) {
-        perf_.remove();
-    }
-
     /*
      * Compare the log level specified with the application.log level defined in application.conf
      */
