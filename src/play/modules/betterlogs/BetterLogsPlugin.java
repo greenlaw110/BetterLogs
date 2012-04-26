@@ -157,8 +157,8 @@ public class BetterLogsPlugin extends PlayPlugin {
             setTraceThemes = Boolean.valueOf(s);
         }
         
-        logActionInvocationTime = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION_TIME, "false"));
-        logActionInvocation = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION, "true"));
+        logActionInvocationTime = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION_TIME, Play.mode.isDev() ? "true":"false"));
+        logActionInvocation = Boolean.parseBoolean(Play.configuration.getProperty(CONF_LOG_ACTION_INVOCATION, Play.mode.isDev() ? "true":"false"));
         
         configured_ = true;
     }
