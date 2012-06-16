@@ -184,8 +184,16 @@ public class BetterLogsPlugin extends PlayPlugin {
     public void afterActionInvocation() {
         if (logActionInvocation) {
             if (logActionInvocationTime) {
-                long start = (Long)Request.current().args.get(KEY), ms = System.currentTimeMillis() - start;
-                Logger.info("[BL]<<<<<<< [%s]: %sms", Request.current().action, ms);
+				Request request = Request.current();
+				if (!request.args.containsKey(KEY)) {
+					/*
+					 * Rythm Cache4 feature can cause to bypass the beforeActionInvocation logic
+					 */
+					Logger.info("[BL]<<<<<<< [%s]", Request.current().action);
+				} else {
+					long start = (Long)Request.current().args.get(KEY), ms = System.currentTimeMillis() - start;
+					Logger.info("[BL]<<<<<<< [%s]: %sms", Request.current().action, ms);
+				}
             } else {
                 Logger.info("[BL]<<<<<<< [%s]", Request.current().action);
             }

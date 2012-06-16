@@ -1,4 +1,5 @@
 # Version history
+# 1.2i - fix bug when using with Rythm Cache4 feature
 # 1.2h - log action invocation time by default on dev mode
 # 1.2g - use request.args to replace threadlocal approach for action invocation start time cache
 # 1.2f - minor change to action invocation log format to make it more concise and clear
@@ -7,7 +8,7 @@
 # 1.2c - display time spend on each action invocation
 # 1.2b - display requested action at beginning and end of action invokation
 # 1.2a - Track time spend in each method
-self: play -> betterlogs 1.2h
+self: play -> betterlogs 1.2i
 
 require:
     - play 1.2
